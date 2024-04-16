@@ -1,0 +1,11 @@
+[submodule "TetrisGYM"]
+	path = TetrisGYM
+	url = https://github.com/zohassadar/TetrisGYM
+	branch = srvedatg
+[submodule "python-edlinkn8"]
+	path = python-edlinkn8
+	url = https://github.com/zohassadar/python-edlinkn8
+[submodule "StackRabbit"]
+	path = StackRabbit
+	url = https://github.com/zohassadar/StackRabbit
+	branch = python
