@@ -5,7 +5,7 @@ from edlinkn8 import NesRom
 from stackrabbit import get_move
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 TIMELINE_10_HZ = "X....."
 
@@ -87,21 +87,24 @@ def main():
     everdrive.load_game(NesRom.from_file("TetrisGYM/tetris.nes"))
 
     while True:
-        if not (data := everdrive.receive_data(205)):
-            continue
-        logger.info(f"Received {len(data)} bytes!")
-        state = PlayfieldState(data)
-        best_move = get_move(state.get_sr_payload())
-        logger.info(f"Stackrabbit says to: {best_move}")
-        offset, x, y = eval(best_move)
-        payload = bytearray(3)
-        if x > 5 or y > 19 or offset > 3:
-            logger.error(f"No valid move from stackrabbit")
-            continue
-        payload[0] = SR_OFFSET_TO_ORIENTATION[(state.currentPiece, offset)]
-        payload[1] = y
-        payload[2] = 5 + x
-        everdrive.write_fifo(payload)
+        try:
+            if not (data := everdrive.receive_data(205)):
+                continue
+            logger.debug(f"Received {len(data)} bytes!")
+            state = PlayfieldState(data)
+            best_move = get_move(state.get_sr_payload())
+            logger.debug(f"Stackrabbit says to: {best_move}")
+            offset, x, y = eval(best_move)
+            payload = bytearray(3)
+            if x > 5 or y > 19 or offset > 3:
+                logger.error(f"No valid move from stackrabbit")
+                continue
+            payload[0] = SR_OFFSET_TO_ORIENTATION[(state.currentPiece, offset)]
+            payload[1] = y
+            payload[2] = 5 + x
+            everdrive.write_fifo(payload)
+        except KeyboardInterrupt:
+            break
 
 
 if __name__ == "__main__":
