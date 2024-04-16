@@ -4,6 +4,8 @@
 ## Install
 
 ```
+git submodule update --init
+
 python -m venv .venv
 echo "*" > .venv/.gitignore
 . .venv/bin/activate
