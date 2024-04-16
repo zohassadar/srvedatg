@@ -14,9 +14,11 @@ def main():
     everdrive.load_game(NesRom.from_file('TetrisGYM/tetris.nes'))
 
     while True:
-        logger.info(f'Reading playfield state')
-        if data := everdrive.receive_data(205):
-            logger.info(f'Received {len(data)}!')
+        if not (data := everdrive.receive_data(205)):
+            continue
+        logger.info(f'Received {len(data)} bytes!')
+        everdrive.write_fifo(b'\x05\x05\x05')
+
 
 if __name__ == "__main__":
     main()
