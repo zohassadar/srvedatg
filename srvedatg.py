@@ -11,6 +11,8 @@ from stackrabbit import get_move
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+GAME_DATA_LEN = 205
+
 TIMELINE_8_HZ = "X......"
 
 # spawn orientation to stackrabbit piece identifier
@@ -123,6 +125,14 @@ def get_args():
     return flags, args.level, args.hertz
 
 
+def empty_buffer(everdrive: Everdrive):
+    i = 0
+    while True:
+        if not everdrive.receive_data(1):
+            break
+        i+=1
+    logger.info(f"Emptied the buffer of {i} bytes")
+
 
 def main():
     flags, level, hertz = get_args()
@@ -133,8 +143,11 @@ def main():
 
     while True:
         try:
-            if not (data := everdrive.receive_data(205)):
+            if not (data := everdrive.receive_data(GAME_DATA_LEN)):
                 continue
+            if (buffer_len := len(data)) != GAME_DATA_LEN:
+                logger.error(f"Received {buffer_len} bytes.  Expected {GAME_DATA_LEN}")
+                empty_buffer(everdrive)
             logger.debug(f"Received {len(data)} bytes!")
             state = PlayfieldState(data, level, hertz)
             best_move = get_move(state.get_sr_payload())
