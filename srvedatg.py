@@ -1,4 +1,8 @@
+import argparse
 import logging
+import os
+import subprocess
+import sys
 
 from edlinkn8 import Everdrive
 from edlinkn8 import NesRom
@@ -7,7 +11,7 @@ from stackrabbit import get_move
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-TIMELINE_10_HZ = "X....."
+TIMELINE_8_HZ = "X......"
 
 # spawn orientation to stackrabbit piece identifier
 ORIENTATION_TO_SR = {
@@ -45,7 +49,9 @@ SR_OFFSET_TO_ORIENTATION = {
 
 
 class PlayfieldState:
-    def __init__(self, state: bytearray):
+    def __init__(self, state: bytearray, level: int | None, hertz: str | None):
+        self.level = level
+        self.hertz = hertz if hertz else TIMELINE_8_HZ
         self.state = state
 
     def get_sr_payload(self):
@@ -55,7 +61,7 @@ class PlayfieldState:
             f"{self.lines}|"
             f"{self.currentPiece}|"
             f"{self.nextPiece}|"
-            f"{TIMELINE_10_HZ}|"
+            f"{self.hertz}|"
         )
 
     @property
@@ -70,6 +76,8 @@ class PlayfieldState:
 
     @property
     def levelNumber(self):
+        if self.level is not None:
+            return self.level
         return self.state[202]
 
     @property
@@ -80,9 +88,46 @@ class PlayfieldState:
     def nextPiece(self):
         return ORIENTATION_TO_SR[self.state[201]]
 
+def build_gym(*flags: tuple[str]):
+    args = ['node', 'build.js', '-S']
+    if flags:
+        args.append('--')
+        args.extend(flags)
+    logger.info(f"Building TetrisGYM with command: {' '.join(args)}")
+    curdir = os.path.dirname(__file__)
+    os.chdir(os.path.join(curdir, 'TetrisGYM'))
+    build = subprocess.Popen(args, stdout=subprocess.PIPE)
+    os.chdir(curdir)
+    result, error = build.communicate()
+    result = result.decode()
+    if "Error:" not in result:
+        logger.info(result)
+        return
+    
+    logger.critical(f"Unable to build Gym: Error: {result.split('Error:')[1]}")
+    sys.exit(1)
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-l', '--level', type=int, help='level override', default=None)
+    parser.add_argument('-f', '--frames', type=int, help='frames to display.  default 10')
+    parser.add_argument('-s', '--showsooner', action="store_true", help='show the move as soon as possible')
+    parser.add_argument('-H', '--hertz', help='stackrabbit timeline', default=None)
+    args = parser.parse_args()
+    flags = []
+    if args.frames:
+        flags.extend(['-D', f'SRVEDATG_DISPLAY_FRAMES={args.frames}'])
+    if args.showsooner:
+        flags.extend(['-D', 'SRVEDATG_SHOW_SOONER=1'])
+    return flags, args.level, args.hertz
+
+
 
 def main():
-    logger.info("Launching custom version of tetrisgym...")
+    flags, level, hertz = get_args()
+    build_gym(*flags)
+    logger.info("Launching TetrisGYM...")
     everdrive = Everdrive()
     everdrive.load_game(NesRom.from_file("TetrisGYM/tetris.nes"))
 
@@ -91,7 +136,7 @@ def main():
             if not (data := everdrive.receive_data(205)):
                 continue
             logger.debug(f"Received {len(data)} bytes!")
-            state = PlayfieldState(data)
+            state = PlayfieldState(data, level, hertz)
             best_move = get_move(state.get_sr_payload())
             logger.debug(f"Stackrabbit says to: {best_move}")
             offset, x, y = eval(best_move)
